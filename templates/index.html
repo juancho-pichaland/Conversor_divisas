@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conversor de Monedas</title>
+   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+    button[type="submit"] {
+        background: linear-gradient(90deg, #36d1c4 0%, #5b86e5 100%);
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        padding: 12px 0;
+        font-size: 1.1rem;
+        width: 100%;
+        margin-top: 18px;
+        cursor: pointer;
+        transition: background 0.3s;
+    }
+    button[type="submit"]:hover {
+        background: linear-gradient(90deg, #5b86e5 0%, #36d1c4 100%);
+    }
+    input[type="number"] {
+        width: 100%;
+        padding: 10px;
+        border-radius: 6px;
+        border: 1px solid #b0c4de;
+        margin-bottom: 16px;
+        font-size: 1rem;
+    }
+</style>
+</head>
+<body>
+    <div class="container mt-5">
+        <h1 class="text-center mb-4">Conversor de Monedas</h1>
+        <form id="form-conversion" class="row g-3">
+            <div class="col-md-6">
+                <label for="cantidad" class="form-label">Cantidad:</label>
+                <input type="number" id="cantidad" name="cantidad" class="form-control" required min="0" step="any">
+            </div>
+            <div class="col-md-6">
+                <label for="origen" class="form-label">Moneda de origen:</label>
+                <select id="origen" name="origen" class="form-select">
+                    {% for moneda in monedas %}
+                    <option value="{{ moneda }}">{{ moneda }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label for="destino" class="form-label">Moneda de destino:</label>
+                <select id="destino" name="destino" class="form-select">
+                    <option value="TODAS">Todas</option>
+                    {% for moneda in monedas %}
+                    <option value="{{ moneda }}">{{ moneda }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12">
+                <button type="submit" class="btn btn-primary w-100">Convertir</button>
+            </div>
+        </form>
+        <div id="resultado" class="mt-4"></div>
+        <canvas id="grafico" class="mt-4"></canvas>
+        <div class="form-check mt-3">
+            <input type="checkbox" id="realtime-toggle" class="form-check-input">
+            <label for="realtime-toggle" class="form-check-label">Actualizar en tiempo real</label>
+        </div>
+    </div>
+    <script>
+        let grafico;
+        let intervalo;
+
+        document.getElementById('form-conversion').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const response = await fetch('/convertir', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+            const resultadoDiv = document.getElementById('resultado');
+            const graficoCanvas = document.getElementById('grafico');
+
+            if (response.ok) {
+                if (formData.get('destino') === 'TODAS') {
+                    resultadoDiv.innerHTML = '<h3>Tasas de cambio:</h3>';
+                    const etiquetas = Object.keys(data);
+                    const valores = Object.values(data);
+
+                    // Renderiza o actualiza el gráfico
+                    if (grafico) {
+                        grafico.data.labels = etiquetas;
+                        grafico.data.datasets[0].data = valores;
+                        grafico.update();
+                    } else {
+                        grafico = new Chart(graficoCanvas, {
+                            type: 'bar',
+                            data: {
+                                labels: etiquetas,
+                                datasets: [{
+                                    label: 'Tasa de cambio',
+                                    data: valores,
+                                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                                    borderColor: 'rgba(75, 192, 192, 1)',
+                                    borderWidth: 1
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                scales: {
+                                    y: {
+                                        beginAtZero: true
+                                    }
+                                }
+                            }
+                        });
+                    }
+                } else {
+                    resultadoDiv.textContent = data.resultado;
+                    graficoCanvas.style.display = 'none'; // Oculta el gráfico si no es necesario
+                }
+            } else {
+                resultadoDiv.textContent = data.error;
+            }
+        });
+
+        document.getElementById('realtime-toggle').addEventListener('change', (e) => {
+            if (e.target.checked) {
+                intervalo = setInterval(() => {
+                    document.getElementById('form-conversion').dispatchEvent(new Event('submit'));
+                }, 5000); // Actualiza cada 5 segundos
+            } else {
+                clearInterval(intervalo);
+            }
+        });
+    </script>
+</body>
+</html>
